@@ -1,0 +1,21 @@
+# dependencies
+node_modules/
+**/node_modules/
+
+# build outputs
+dist/
+**/dist/
+web-build/
+**/web-build/
+.expo/
+**/.expo/
+
+# archives & local env
+*.zip
+.env
+.env*.local
+**/.env
+
+# IDE / scratch
+.claude/
+scratch/
