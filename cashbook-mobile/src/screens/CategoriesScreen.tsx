@@ -32,7 +32,7 @@ type CategoriesResponse = {
 };
 
 export default function CategoriesScreen({ route, navigation }: Props) {
-  const { businessId, businessName } = route.params;
+  const { businessId, businessName, bookId, bookName, currency } = route.params;
 
   const [categories, setCategories] = useState<Category[]>([]);
   const [activeFilter, setActiveFilter] = useState<'all' | 'income' | 'expense'>('all');
@@ -73,13 +73,14 @@ export default function CategoriesScreen({ route, navigation }: Props) {
   );
 
   const filteredCategories = categories.filter((c) => {
-    if (activeFilter === 'income') return c.type === 'income';
-    if (activeFilter === 'expense') return c.type === 'expense';
+    const cType = (c.type || '').toLowerCase();
+    if (activeFilter === 'income') return cType === 'income';
+    if (activeFilter === 'expense') return cType === 'expense';
     return true;
   });
 
   const renderCategoryCard = ({ item }: { item: Category }) => {
-    const isIncome = item.type === 'income';
+    const isIncome = (item.type || '').toLowerCase() === 'income';
 
     return (
       <View style={styles.card}>
@@ -91,7 +92,7 @@ export default function CategoriesScreen({ route, navigation }: Props) {
             ]}
           >
             <Ionicons
-              name={isIncome ? 'pricetag-outline' : 'pricetag-outline'}
+              name="pricetag-outline"
               size={20}
               color={isIncome ? '#16A34A' : '#DC2626'}
             />
@@ -136,11 +137,32 @@ export default function CategoriesScreen({ route, navigation }: Props) {
           <View style={styles.headerTitleContainer}>
             <Text style={styles.headerSubtitle}>{businessName}</Text>
             <Text style={styles.headerTitle} numberOfLines={1}>
-              Categories
+              {bookName ? bookName : 'Categories'}
             </Text>
           </View>
           <View style={{ width: 24 }} />
         </View>
+
+        {/* Book Navigation Bar */}
+        {bookId ? (
+          <View style={styles.bookNavContainer}>
+            <Pressable
+              style={[styles.bookNavTab, styles.bookNavTabInactive]}
+              onPress={() => navigation.goBack()}
+            >
+              <Ionicons name="receipt-outline" size={16} color="#64748B" style={{ marginRight: 6 }} />
+              <Text style={styles.bookNavTextInactive}>Transactions</Text>
+            </Pressable>
+
+            <Pressable
+              style={[styles.bookNavTab, styles.bookNavTabActive]}
+              onPress={() => {}}
+            >
+              <Ionicons name="pricetags-outline" size={16} color="#2563EB" style={{ marginRight: 6 }} />
+              <Text style={styles.bookNavTextActive}>Categories</Text>
+            </Pressable>
+          </View>
+        ) : null}
 
         {/* Filter Segmented Bar */}
         <View style={styles.filterRow}>
@@ -205,6 +227,9 @@ export default function CategoriesScreen({ route, navigation }: Props) {
               navigation.navigate('CreateCategory', {
                 businessId,
                 businessName,
+                bookId,
+                bookName,
+                currency,
               })
             }
           >
@@ -292,7 +317,43 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingVertical: 8,
-    marginBottom: 12,
+    marginBottom: 8,
+  },
+  bookNavContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#F1F5F9',
+    borderRadius: 10,
+    padding: 3,
+    marginBottom: 16,
+  },
+  bookNavTab: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  bookNavTabActive: {
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 1,
+    elevation: 1,
+  },
+  bookNavTabInactive: {
+    backgroundColor: 'transparent',
+  },
+  bookNavTextActive: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#2563EB',
+  },
+  bookNavTextInactive: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#64748B',
   },
   backButton: {
     padding: 4,

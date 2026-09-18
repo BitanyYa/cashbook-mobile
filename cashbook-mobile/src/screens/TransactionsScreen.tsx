@@ -196,17 +196,33 @@ export default function TransactionsScreen({ route, navigation }: Props) {
               {bookName}
             </Text>
           </View>
+          <View style={{ width: 24 }} />
+        </View>
+
+        {/* Book Navigation Bar */}
+        <View style={styles.bookNavContainer}>
           <Pressable
+            style={[styles.bookNavTab, styles.bookNavTabActive]}
+            onPress={() => {}}
+          >
+            <Ionicons name="receipt-outline" size={16} color="#2563EB" style={{ marginRight: 6 }} />
+            <Text style={styles.bookNavTextActive}>Transactions</Text>
+          </Pressable>
+
+          <Pressable
+            style={[styles.bookNavTab, styles.bookNavTabInactive]}
             onPress={() =>
               navigation.navigate('Categories', {
                 businessId,
                 businessName,
+                bookId,
+                bookName,
+                currency,
               })
             }
-            style={styles.headerCategoryIconButton}
-            hitSlop={8}
           >
-            <Ionicons name="pricetags-outline" size={22} color="#2563EB" />
+            <Ionicons name="pricetags-outline" size={16} color="#64748B" style={{ marginRight: 6 }} />
+            <Text style={styles.bookNavTextInactive}>Categories</Text>
           </Pressable>
         </View>
 
@@ -341,7 +357,43 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingVertical: 8,
-    marginBottom: 12,
+    marginBottom: 8,
+  },
+  bookNavContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#F1F5F9',
+    borderRadius: 10,
+    padding: 3,
+    marginBottom: 16,
+  },
+  bookNavTab: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  bookNavTabActive: {
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 1,
+    elevation: 1,
+  },
+  bookNavTabInactive: {
+    backgroundColor: 'transparent',
+  },
+  bookNavTextActive: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#2563EB',
+  },
+  bookNavTextInactive: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#64748B',
   },
   backButton: {
     padding: 4,

@@ -54,10 +54,16 @@ export type RootStackParamList = {
   Categories: {
     businessId: string;
     businessName: string;
+    bookId?: string;
+    bookName?: string;
+    currency?: string;
   };
   CreateCategory: {
     businessId: string;
     businessName: string;
+    bookId?: string;
+    bookName?: string;
+    currency?: string;
   };
 };
 
