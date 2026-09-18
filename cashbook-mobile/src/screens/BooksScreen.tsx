@@ -122,27 +122,52 @@ export default function BooksScreen({ route, navigation }: Props) {
               {businessName}
             </Text>
           </View>
-          <View style={{ width: 24 }} />
+          <Pressable
+            onPress={() =>
+              navigation.navigate('Categories', {
+                businessId,
+                businessName,
+              })
+            }
+            style={styles.headerCategoryIconButton}
+            hitSlop={8}
+          >
+            <Ionicons name="pricetags-outline" size={22} color="#2563EB" />
+          </Pressable>
         </View>
 
         {/* Section Title */}
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Books</Text>
-          {books.length > 0 ? (
+          <View style={styles.sectionHeaderActions}>
             <Pressable
-              style={styles.headerCreateButton}
+              style={styles.headerCategoryButton}
               onPress={() =>
-                navigation.navigate('CreateBook', {
+                navigation.navigate('Categories', {
                   businessId,
                   businessName,
-                  currency,
                 })
               }
             >
-              <Ionicons name="add" size={18} color="#2563EB" />
-              <Text style={styles.headerCreateText}>Create Book</Text>
+              <Ionicons name="pricetags-outline" size={16} color="#2563EB" />
+              <Text style={styles.headerCategoryText}>Categories</Text>
             </Pressable>
-          ) : null}
+            {books.length > 0 ? (
+              <Pressable
+                style={styles.headerCreateButton}
+                onPress={() =>
+                  navigation.navigate('CreateBook', {
+                    businessId,
+                    businessName,
+                    currency,
+                  })
+                }
+              >
+                <Ionicons name="add" size={18} color="#2563EB" />
+                <Text style={styles.headerCreateText}>Create Book</Text>
+              </Pressable>
+            ) : null}
+          </View>
         </View>
 
         {/* Content */}
@@ -243,16 +268,40 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#0F172A',
   },
+  headerCategoryIconButton: {
+    padding: 4,
+  },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 16,
   },
+  sectionHeaderActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   sectionTitle: {
     fontSize: 20,
     fontWeight: '700',
     color: '#0F172A',
+  },
+  headerCategoryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    backgroundColor: '#F1F5F9',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  headerCategoryText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#2563EB',
+    marginLeft: 4,
   },
   headerCreateButton: {
     flexDirection: 'row',

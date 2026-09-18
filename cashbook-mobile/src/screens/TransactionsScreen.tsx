@@ -196,7 +196,18 @@ export default function TransactionsScreen({ route, navigation }: Props) {
               {bookName}
             </Text>
           </View>
-          <View style={{ width: 24 }} />
+          <Pressable
+            onPress={() =>
+              navigation.navigate('Categories', {
+                businessId,
+                businessName,
+              })
+            }
+            style={styles.headerCategoryIconButton}
+            hitSlop={8}
+          >
+            <Ionicons name="pricetags-outline" size={22} color="#2563EB" />
+          </Pressable>
         </View>
 
         {/* Summary Card */}
@@ -337,6 +348,9 @@ const styles = StyleSheet.create({
   },
   headerTitleContainer: {
     alignItems: 'center',
+  },
+  headerCategoryIconButton: {
+    padding: 4,
   },
   headerSubtitle: {
     fontSize: 12,
