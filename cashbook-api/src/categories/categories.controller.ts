@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Post,
@@ -50,6 +51,19 @@ export class CategoriesController {
     @Param('id') id: string,
   ) {
     return this.categoriesService.findOne(
+      req.user.id,
+      businessId,
+      id,
+    );
+  }
+
+  @Delete(':id')
+  async remove(
+    @Req() req: any,
+    @Param('businessId') businessId: string,
+    @Param('id') id: string,
+  ) {
+    return this.categoriesService.remove(
       req.user.id,
       businessId,
       id,

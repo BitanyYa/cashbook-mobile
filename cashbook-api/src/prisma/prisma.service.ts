@@ -7,6 +7,10 @@ export class PrismaService
   implements OnModuleInit
 {
   async onModuleInit() {
-    await this.$connect();
+    try {
+      await this.$connect();
+    } catch (err) {
+      console.error('Prisma initial connection warning:', err instanceof Error ? err.message : err);
+    }
   }
 }
