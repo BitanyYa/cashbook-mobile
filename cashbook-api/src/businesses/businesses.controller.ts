@@ -1,7 +1,8 @@
-﻿import {
+import {
   Body,
   Controller,
   Get,
+  Query,
   Param,
   Post,
   Req,
@@ -44,4 +45,43 @@ export class BusinessesController {
   ) {
     return this.businessesService.findOneForUser(id, req.user.id);
   }
+
+  @Get(':id/members')
+  async getMembers(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') id: string,
+  ) {
+    return this.businessesService.getMembersForBusiness(id, req.user.id);
+  }
+
+  @Get(':id/contact-names')
+  async getContactNames(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') id: string,
+    @Query('q') query?: string,
+  ) {
+    return this.businessesService.getContactNamesForBusiness(id, req.user.id, query);
+  }
+
+  @Get(':id/contact-transactions')
+  async getContactTransactions(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') id: string,
+    @Query('contact_name') contactName: string,
+    @Query('book_id') bookId?: string,
+    @Query('type') type?: string,
+    @Query('from_date') fromDate?: string,
+    @Query('to_date') toDate?: string,
+    @Query('search') search?: string,
+  ) {
+    return this.businessesService.getContactTransactionsForBusiness(id, req.user.id, {
+      contact_name: contactName,
+      book_id: bookId,
+      type,
+      from_date: fromDate,
+      to_date: toDate,
+      search,
+    });
+  }
+
 }

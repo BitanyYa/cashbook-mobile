@@ -12,6 +12,7 @@ import CreateTransactionScreen from './src/screens/CreateTransactionScreen';
 import TransactionDetailsScreen from './src/screens/TransactionDetailsScreen';
 import CategoriesScreen from './src/screens/CategoriesScreen';
 import CreateCategoryScreen from './src/screens/CreateCategoryScreen';
+import ContactHistoryScreen from './src/screens/ContactHistoryScreen';
 
 export type RootStackParamList = {
   Login: undefined;
@@ -57,6 +58,14 @@ export type RootStackParamList = {
     bookId?: string;
     bookName?: string;
     currency?: string;
+  };
+  ContactHistory: {
+    businessId: string;
+    businessName: string;
+    contactName: string;
+    currency: string;
+    bookId?: string;
+    bookName?: string;
   };
   CreateCategory: {
     businessId: string;
@@ -128,6 +137,10 @@ export default function App() {
           component={CategoriesScreen}
         />
 
+        <Stack.Screen
+          name="ContactHistory"
+          component={ContactHistoryScreen}
+        />
         <Stack.Screen
           name="CreateCategory"
           component={CreateCategoryScreen}

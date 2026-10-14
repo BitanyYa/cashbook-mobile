@@ -1,48 +1,96 @@
-import { useCallback, useState } from 'react';
+import React, { useState, useCallback } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
-  ActivityIndicator,
-  Alert,
+  View,
+  Text,
+  StyleSheet,
   Pressable,
   ScrollView,
-  StyleSheet,
-  Text,
-  View,
+  ActivityIndicator,
+  Alert,
+  Image,
+  Modal,
+  Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useFocusEffect } from '@react-navigation/native';
-import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
-
+import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../App';
-import { apiRequest } from '../services/api';
-import { Transaction } from './TransactionsScreen';
+import { apiRequest, getAttachmentUrl } from '../services/api';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'TransactionDetails'>;
 
-export default function TransactionDetailsScreen({ route, navigation }: Props) {
-  const { businessId, businessName, bookId, bookName, currency, transactionId } =
-    route.params;
+interface AttachmentItem {
+  id: string;
+  filePath: string;
+  originalName: string;
+  mimeType: string;
+  fileSize?: number | null;
+  url?: string;
+}
 
-  const [transaction, setTransaction] = useState<Transaction | null>(null);
+interface TransactionDetails {
+  id: string;
+  businessId: string;
+  bookId: string;
+  categoryId?: string | null;
+  userId?: string | null;
+  amount: string;
+  type: 'income' | 'expense';
+  mode?: string | null;
+  imagePath?: string | null;
+  image_path?: string | null;
+  attachments?: AttachmentItem[];
+  status?: string;
+  description?: string | null;
+  contactName?: string | null;
+  transactionDate: string;
+  createdAt?: string;
+  updatedAt?: string;
+  category?: {
+    id: string;
+    name: string;
+    type?: string | null;
+  } | null;
+  user?: {
+    id: string;
+    name: string;
+    email?: string;
+  } | null;
+}
+
+export default function TransactionDetailsScreen({
+  route,
+  navigation,
+}: Props) {
+  const {
+    businessId,
+    businessName,
+    bookId,
+    bookName,
+    currency,
+    transactionId,
+  } = route.params;
+
+  const [transaction, setTransaction] = useState<TransactionDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState('');
+
+  // Image Modal Preview State
+  const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
 
   const fetchDetails = async () => {
     try {
       setLoading(true);
       setError('');
-      const data = await apiRequest<Transaction>(
+      const data = await apiRequest<TransactionDetails>(
         `/businesses/${businessId}/books/${bookId}/transactions/${transactionId}`
       );
       setTransaction(data);
-    } catch (err) {
-      console.error('FETCH TRANSACTION DETAILS ERROR:', err);
-      const message =
-        err instanceof Error
-          ? err.message
-          : 'Failed to load transaction details.';
-      setError(message);
+    } catch (err: any) {
+      console.error('Fetch transaction details error:', err);
+      setError(err.message || 'Failed to load transaction details.');
     } finally {
       setLoading(false);
     }
@@ -56,8 +104,8 @@ export default function TransactionDetailsScreen({ route, navigation }: Props) {
 
   const confirmDelete = () => {
     Alert.alert(
-      'Delete Transaction?',
-      'This transaction will be removed from your active transaction list.',
+      'Delete Transaction',
+      'Are you sure you want to delete this transaction? This action cannot be undone.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -74,64 +122,127 @@ export default function TransactionDetailsScreen({ route, navigation }: Props) {
       setDeleting(true);
       await apiRequest(
         `/businesses/${businessId}/books/${bookId}/transactions/${transactionId}`,
-        {
-          method: 'DELETE',
-        }
+        { method: 'DELETE' }
       );
-
-      navigation.navigate('Transactions', {
-        businessId,
-        businessName,
-        bookId,
-        bookName,
-        currency,
-      });
-    } catch (err) {
-      console.error('DELETE TRANSACTION ERROR:', err);
-      const message =
-        err instanceof Error
-          ? err.message
-          : 'Failed to delete transaction. Please try again.';
-      Alert.alert('Error', message);
+      navigation.goBack();
+    } catch (err: any) {
+      Alert.alert('Error', err.message || 'Failed to delete transaction.');
     } finally {
       setDeleting(false);
     }
   };
 
   const formatDate = (dateStr?: string) => {
-    if (!dateStr) return 'N/A';
+    if (!dateStr) return '';
     try {
       const d = new Date(dateStr);
       if (isNaN(d.getTime())) return dateStr;
       return d.toLocaleDateString(undefined, {
+        weekday: 'short',
         year: 'numeric',
         month: 'short',
         day: 'numeric',
       });
     } catch {
-      return dateStr;
+      return dateStr || '';
     }
   };
 
-  const isIncome = transaction?.type === 'income';
-  const formattedAmount = transaction
-    ? parseFloat(transaction.amount).toLocaleString(undefined, {
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+        <View style={styles.container}>
+          <View style={styles.topBar}>
+            <Pressable onPress={() => navigation.goBack()} style={styles.backButton}>
+              <Ionicons name="arrow-back" size={24} color="#0F172A" />
+            </Pressable>
+            <View style={styles.headerTitleContainer}>
+              <Text style={styles.headerSubtitle}>{bookName}</Text>
+              <Text style={styles.headerTitle}>Transaction Details</Text>
+            </View>
+            <View style={{ width: 24 }} />
+          </View>
+          <View style={styles.centerContainer}>
+            <ActivityIndicator size="large" color="#2563EB" />
+            <Text style={styles.loadingText}>Loading details...</Text>
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (error || !transaction) {
+    return (
+      <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+        <View style={styles.container}>
+          <View style={styles.topBar}>
+            <Pressable onPress={() => navigation.goBack()} style={styles.backButton}>
+              <Ionicons name="arrow-back" size={24} color="#0F172A" />
+            </Pressable>
+            <View style={styles.headerTitleContainer}>
+              <Text style={styles.headerSubtitle}>{bookName}</Text>
+              <Text style={styles.headerTitle}>Transaction Details</Text>
+            </View>
+            <View style={{ width: 24 }} />
+          </View>
+          <View style={styles.centerContainer}>
+            <Ionicons name="alert-circle-outline" size={48} color="#DC2626" />
+            <Text style={styles.errorTitle}>Error Loading Transaction</Text>
+            <Text style={styles.errorMessage}>{error || 'Transaction not found'}</Text>
+            <Pressable style={styles.retryButton} onPress={fetchDetails}>
+              <Text style={styles.retryButtonText}>Retry</Text>
+            </Pressable>
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  const isIncome = transaction.type === 'income';
+  const amountVal = parseFloat(transaction.amount || '0');
+  const formattedAmount = isNaN(amountVal)
+    ? transaction.amount
+    : amountVal.toLocaleString(undefined, {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
-      })
-    : '0.00';
+      });
+
+  // Extract attachments list
+  const attachmentsList: AttachmentItem[] = [];
+  if (Array.isArray(transaction.attachments) && transaction.attachments.length > 0) {
+    transaction.attachments.forEach((att) => {
+      attachmentsList.push({
+        id: att.id,
+        filePath: att.filePath,
+        originalName: att.originalName || att.filePath.split('/').pop() || 'Attachment',
+        mimeType: att.mimeType || (att.filePath.endsWith('.pdf') ? 'application/pdf' : 'image/jpeg'),
+        fileSize: att.fileSize,
+        url: getAttachmentUrl(att.url || att.filePath) || undefined,
+      });
+    });
+  } else if (transaction.imagePath || transaction.image_path) {
+    const pStr = transaction.imagePath || transaction.image_path!;
+    attachmentsList.push({
+      id: 'legacy-1',
+      filePath: pStr,
+      originalName: pStr.split('/').pop() || 'Receipt',
+      mimeType: pStr.endsWith('.pdf') ? 'application/pdf' : 'image/jpeg',
+      url: getAttachmentUrl(pStr) || undefined,
+    });
+  }
+
+  const handleOpenAttachment = (att: AttachmentItem) => {
+    if (att.url) {
+      setPreviewImageUrl(att.url);
+    }
+  };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
       <View style={styles.container}>
-        {/* Top Bar */}
+        {/* Top Header */}
         <View style={styles.topBar}>
-          <Pressable
-            onPress={() => navigation.goBack()}
-            style={styles.backButton}
-            hitSlop={12}
-            disabled={deleting}
-          >
+          <Pressable onPress={() => navigation.goBack()} style={styles.backButton}>
             <Ionicons name="arrow-back" size={24} color="#0F172A" />
           </Pressable>
           <View style={styles.headerTitleContainer}>
@@ -141,143 +252,219 @@ export default function TransactionDetailsScreen({ route, navigation }: Props) {
           <View style={{ width: 24 }} />
         </View>
 
-        {loading ? (
-          <View style={styles.centerContainer}>
-            <ActivityIndicator size="large" color="#2563EB" />
-            <Text style={styles.loadingText}>Loading details...</Text>
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Main Card */}
+          <View style={styles.card}>
+            <View style={styles.cardHeader}>
+              <View
+                style={[
+                  styles.iconCircle,
+                  isIncome ? styles.incomeIconBg : styles.expenseIconBg,
+                ]}
+              >
+                <Ionicons
+                  name={isIncome ? 'arrow-down' : 'arrow-up'}
+                  size={24}
+                  color={isIncome ? '#16A34A' : '#DC2626'}
+                />
+              </View>
+              <View>
+                <Text style={styles.typeText}>
+                  {isIncome ? 'Cash In' : 'Cash Out'}
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.amountDisplayContainer}>
+              <Text
+                style={[
+                  styles.amountText,
+                  isIncome ? styles.incomeText : styles.expenseText,
+                ]}
+              >
+                {isIncome ? '+' : '-'} {formattedAmount} {currency}
+              </Text>
+            </View>
           </View>
-        ) : error || !transaction ? (
-          <View style={styles.centerContainer}>
-            <Ionicons name="alert-circle-outline" size={48} color="#DC2626" />
-            <Text style={styles.errorTitle}>Error</Text>
-            <Text style={styles.errorMessage}>
-              {error || 'Transaction not found.'}
-            </Text>
-            <Pressable style={styles.retryButton} onPress={fetchDetails}>
-              <Text style={styles.retryButtonText}>Retry</Text>
-            </Pressable>
-          </View>
-        ) : (
-          <ScrollView contentContainerStyle={styles.scrollContent}>
-            {/* Amount Banner Card */}
-            <View style={styles.card}>
-              <View style={styles.cardHeader}>
-                <View
-                  style={[
-                    styles.iconCircle,
-                    isIncome ? styles.incomeIconBg : styles.expenseIconBg,
-                  ]}
-                >
-                  <Ionicons
-                    name={isIncome ? 'arrow-down' : 'arrow-up'}
-                    size={24}
-                    color={isIncome ? '#16A34A' : '#DC2626'}
-                  />
-                </View>
-                <View>
-                  <Text style={styles.typeText}>
-                    {isIncome ? 'Income' : 'Expense'}
+
+          {/* Information List Card */}
+          <View style={styles.infoCard}>
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>Date</Text>
+              <Text style={styles.infoValue}>
+                {formatDate(transaction.transactionDate)}
+              </Text>
+            </View>
+
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>Category</Text>
+              <Text style={styles.infoValue}>
+                {transaction.category ? transaction.category.name : 'Not selected'}
+              </Text>
+            </View>
+
+            {attachmentsList.length > 0 ? (
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Receipts / Attachments</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                  <Ionicons name="document-attach-outline" size={16} color="#0D9488" />
+                  <Text style={[styles.infoValue, { color: '#0D9488', fontWeight: '600' }]}>
+                    {attachmentsList.length} Attached
                   </Text>
-                  <View style={styles.statusBadge}>
-                    <View style={styles.statusDot} />
-                    <Text style={styles.statusText}>
-                      {transaction.status.toUpperCase()}
+                </View>
+              </View>
+            ) : transaction.mode ? (
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Payment Mode</Text>
+                <Text style={styles.infoValue}>{transaction.mode}</Text>
+              </View>
+            ) : null}
+
+            {transaction.contactName ? (
+              <Pressable
+                style={[styles.infoRow, styles.contactRowPressable]}
+                onPress={() => {
+                  navigation.navigate('ContactHistory', {
+                    businessId,
+                    businessName,
+                    contactName: transaction.contactName!,
+                    currency,
+                    bookId,
+                    bookName,
+                  });
+                }}
+              >
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.infoLabel}>Contact Name</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 3, gap: 6 }}>
+                    <Ionicons name="person-circle-outline" size={18} color="#2563EB" />
+                    <Text style={[styles.infoValue, styles.contactValueHighlight]}>
+                      {transaction.contactName}
                     </Text>
                   </View>
                 </View>
-              </View>
+                <View style={styles.viewHistoryBadge}>
+                  <Text style={styles.viewHistoryBadgeText}>History</Text>
+                  <Ionicons name="chevron-forward" size={14} color="#2563EB" />
+                </View>
+              </Pressable>
+            ) : null}
 
-              <View style={styles.amountDisplayContainer}>
-                <Text
-                  style={[
-                    styles.amountText,
-                    isIncome ? styles.incomeText : styles.expenseText,
-                  ]}
-                >
-                  {isIncome ? '+' : '-'} {formattedAmount} {currency}
-                </Text>
-              </View>
-            </View>
-
-            {/* Information List Card */}
-            <View style={styles.infoCard}>
+            {transaction.user ? (
               <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>Date</Text>
-                <Text style={styles.infoValue}>
-                  {formatDate(transaction.transactionDate)}
-                </Text>
+                <Text style={styles.infoLabel}>Created By</Text>
+                <Text style={styles.infoValue}>{transaction.user.name}</Text>
               </View>
+            ) : null}
 
-              {transaction.mode ? (
-                <View style={styles.infoRow}>
-                  <Text style={styles.infoLabel}>Payment Mode</Text>
-                  <Text style={styles.infoValue}>{transaction.mode}</Text>
-                </View>
-              ) : null}
+            {transaction.description ? (
+              <View style={[styles.infoRow, { borderBottomWidth: 0 }]}>
+                <Text style={styles.infoLabel}>Description</Text>
+                <Text style={styles.infoValue}>{transaction.description}</Text>
+              </View>
+            ) : null}
+          </View>
 
-              {transaction.contactName ? (
-                <View style={styles.infoRow}>
-                  <Text style={styles.infoLabel}>Contact Name</Text>
-                  <Text style={styles.infoValue}>{transaction.contactName}</Text>
-                </View>
-              ) : null}
-
-              {transaction.description ? (
-                <View style={[styles.infoRow, { borderBottomWidth: 0 }]}>
-                  <Text style={styles.infoLabel}>Description</Text>
-                  <Text style={styles.infoValue}>{transaction.description}</Text>
-                </View>
-              ) : null}
+          {/* Attachments Section if present */}
+          {attachmentsList.length > 0 ? (
+            <View style={styles.attachmentsCard}>
+              <Text style={styles.attachmentsTitle}>Receipts / Images ({attachmentsList.length})</Text>
+              <View style={styles.attachmentsGrid}>
+                {attachmentsList.map((att, idx) => {
+                  return (
+                    <Pressable
+                      key={att.id || idx}
+                      style={styles.attachmentCardItem}
+                      onPress={() => handleOpenAttachment(att)}
+                    >
+                      {att.url ? (
+                        <Image source={{ uri: att.url }} style={styles.attachmentImagePreview} />
+                      ) : (
+                        <View style={styles.attachmentImagePreview}>
+                          <Ionicons name="image-outline" size={28} color="#64748B" />
+                        </View>
+                      )}
+                      <Text style={styles.attachmentFilename} numberOfLines={1}>
+                        {att.originalName}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
             </View>
+          ) : null}
 
-            {/* Action Buttons */}
-            <View style={styles.actionRow}>
-              <Pressable
-                style={[styles.actionBtn, styles.editBtn]}
-                onPress={() =>
-                  navigation.navigate('CreateTransaction', {
-                    businessId,
-                    businessName,
-                    bookId,
-                    bookName,
-                    currency,
-                    transactionId,
-                  })
-                }
-                disabled={deleting}
-              >
-                <Ionicons
-                  name="create-outline"
-                  size={18}
-                  color="#2563EB"
-                  style={{ marginRight: 6 }}
-                />
-                <Text style={styles.editBtnText}>Edit</Text>
-              </Pressable>
+          {/* Action Buttons */}
+          <View style={styles.actionRow}>
+            <Pressable
+              style={[styles.actionBtn, styles.editBtn]}
+              onPress={() =>
+                navigation.navigate('CreateTransaction', {
+                  businessId,
+                  businessName,
+                  bookId,
+                  bookName,
+                  currency,
+                  transactionId,
+                })
+              }
+              disabled={deleting}
+            >
+              <Ionicons
+                name="create-outline"
+                size={18}
+                color="#2563EB"
+                style={{ marginRight: 6 }}
+              />
+              <Text style={styles.editBtnText}>Edit</Text>
+            </Pressable>
 
-              <Pressable
-                style={[styles.actionBtn, styles.deleteBtn]}
-                onPress={confirmDelete}
-                disabled={deleting}
-              >
-                {deleting ? (
-                  <ActivityIndicator color="#DC2626" />
-                ) : (
-                  <>
-                    <Ionicons
-                      name="trash-outline"
-                      size={18}
-                      color="#DC2626"
-                      style={{ marginRight: 6 }}
-                    />
-                    <Text style={styles.deleteBtnText}>Delete</Text>
-                  </>
-                )}
-              </Pressable>
-            </View>
-          </ScrollView>
-        )}
+            <Pressable
+              style={[styles.actionBtn, styles.deleteBtn]}
+              onPress={confirmDelete}
+              disabled={deleting}
+            >
+              {deleting ? (
+                <ActivityIndicator color="#DC2626" />
+              ) : (
+                <>
+                  <Ionicons
+                    name="trash-outline"
+                    size={18}
+                    color="#DC2626"
+                    style={{ marginRight: 6 }}
+                  />
+                  <Text style={styles.deleteBtnText}>Delete</Text>
+                </>
+              )}
+            </Pressable>
+          </View>
+        </ScrollView>
       </View>
+
+      {/* Image Preview Modal */}
+      <Modal
+        visible={Boolean(previewImageUrl)}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setPreviewImageUrl(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <Pressable style={styles.modalCloseBackdrop} onPress={() => setPreviewImageUrl(null)}>
+            <Ionicons name="close" size={28} color="#FFFFFF" />
+          </Pressable>
+          {previewImageUrl ? (
+            <Image
+              source={{ uri: previewImageUrl }}
+              style={styles.fullScreenImage}
+              resizeMode="contain"
+            />
+          ) : null}
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -387,27 +574,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#0F172A',
   },
-  statusBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FEF3C7',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-    marginTop: 2,
-  },
-  statusDot: {
-    width: 5,
-    height: 5,
-    borderRadius: 2.5,
-    backgroundColor: '#D97706',
-    marginRight: 4,
-  },
-  statusText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#D97706',
-  },
   amountDisplayContainer: {
     alignItems: 'center',
   },
@@ -427,7 +593,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E2E8F0',
     paddingHorizontal: 16,
-    marginBottom: 24,
+    marginBottom: 16,
   },
   infoRow: {
     flexDirection: 'row',
@@ -447,6 +613,61 @@ const styles = StyleSheet.create({
     color: '#0F172A',
     maxWidth: '60%',
     textAlign: 'right',
+  },
+  attachmentsCard: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    padding: 16,
+    marginBottom: 24,
+  },
+  attachmentsTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#0F172A',
+    marginBottom: 12,
+  },
+  attachmentsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  attachmentCardItem: {
+    width: 96,
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    padding: 8,
+  },
+  attachmentImagePreview: {
+    width: 80,
+    height: 80,
+    borderRadius: 6,
+    marginBottom: 6,
+  },
+  pdfCardPreview: {
+    width: 80,
+    height: 80,
+    borderRadius: 6,
+    backgroundColor: '#FEE2E2',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  pdfCardText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#DC2626',
+    marginTop: 2,
+  },
+  attachmentFilename: {
+    fontSize: 11,
+    color: '#334155',
+    fontWeight: '600',
+    textAlign: 'center',
   },
   actionRow: {
     flexDirection: 'row',
@@ -479,4 +700,52 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
   },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalCloseBackdrop: {
+    position: 'absolute',
+    top: 40,
+    right: 20,
+    zIndex: 10,
+    padding: 8,
+  },
+  fullScreenImage: {
+    width: '90%',
+    height: '80%',
+  },
+
+  contactRowPressable: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginVertical: 4,
+  },
+  contactValueHighlight: {
+    color: '#2563EB',
+    fontWeight: '700',
+  },
+  viewHistoryBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#EFF6FF',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    gap: 2,
+    borderWidth: 1,
+    borderColor: '#DBEAFE',
+  },
+  viewHistoryBadgeText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#2563EB',
+  },
+
 });
