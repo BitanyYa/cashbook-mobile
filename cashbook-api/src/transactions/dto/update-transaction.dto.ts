@@ -3,6 +3,7 @@ import {
   IsOptional,
   IsString,
   Matches,
+  ValidateIf,
 } from 'class-validator';
 
 export enum TransactionType {
@@ -31,6 +32,11 @@ export class UpdateTransactionDto {
   @IsOptional()
   @IsString()
   mode?: string;
+
+  @IsOptional()
+  @ValidateIf((o, v) => v !== null && v !== undefined && v !== '')
+  @IsString()
+  category_id?: string | null;
 
   @IsOptional()
   @IsString()

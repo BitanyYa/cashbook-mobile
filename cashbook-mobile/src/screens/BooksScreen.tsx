@@ -122,52 +122,27 @@ export default function BooksScreen({ route, navigation }: Props) {
               {businessName}
             </Text>
           </View>
-          <Pressable
-            onPress={() =>
-              navigation.navigate('Categories', {
-                businessId,
-                businessName,
-              })
-            }
-            style={styles.headerCategoryIconButton}
-            hitSlop={8}
-          >
-            <Ionicons name="pricetags-outline" size={22} color="#2563EB" />
-          </Pressable>
+          <View style={{ width: 24 }} />
         </View>
 
         {/* Section Title */}
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Books</Text>
-          <View style={styles.sectionHeaderActions}>
+          {books.length > 0 ? (
             <Pressable
-              style={styles.headerCategoryButton}
+              style={styles.headerCreateButton}
               onPress={() =>
-                navigation.navigate('Categories', {
+                navigation.navigate('CreateBook', {
                   businessId,
                   businessName,
+                  currency,
                 })
               }
             >
-              <Ionicons name="pricetags-outline" size={16} color="#2563EB" />
-              <Text style={styles.headerCategoryText}>Categories</Text>
+              <Ionicons name="add" size={18} color="#2563EB" />
+              <Text style={styles.headerCreateText}>Create Book</Text>
             </Pressable>
-            {books.length > 0 ? (
-              <Pressable
-                style={styles.headerCreateButton}
-                onPress={() =>
-                  navigation.navigate('CreateBook', {
-                    businessId,
-                    businessName,
-                    currency,
-                  })
-                }
-              >
-                <Ionicons name="add" size={18} color="#2563EB" />
-                <Text style={styles.headerCreateText}>Create Book</Text>
-              </Pressable>
-            ) : null}
-          </View>
+          ) : null}
         </View>
 
         {/* Content */}

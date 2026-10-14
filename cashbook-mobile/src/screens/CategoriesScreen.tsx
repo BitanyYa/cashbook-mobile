@@ -1,11 +1,13 @@
 import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Pressable,
   RefreshControl,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -22,7 +24,7 @@ export type Category = {
   id: string;
   businessId: string;
   name: string;
-  type: 'income' | 'expense';
+  type?: string;
   createdAt?: string;
   updatedAt?: string;
 };
@@ -35,9 +37,10 @@ export default function CategoriesScreen({ route, navigation }: Props) {
   const { businessId, businessName, bookId, bookName, currency } = route.params;
 
   const [categories, setCategories] = useState<Category[]>([]);
-  const [activeFilter, setActiveFilter] = useState<'all' | 'income' | 'expense'>('all');
+  const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [error, setError] = useState('');
 
   const fetchCategories = async (isRefresh = false) => {
@@ -50,7 +53,6 @@ export default function CategoriesScreen({ route, navigation }: Props) {
       setError('');
 
       const endpoint = `/businesses/${businessId}/categories`;
-
       const response = await apiRequest<CategoriesResponse>(endpoint);
       setCategories(response.categories || []);
     } catch (err) {
@@ -72,51 +74,66 @@ export default function CategoriesScreen({ route, navigation }: Props) {
     }, [businessId])
   );
 
+  const confirmDeleteCategory = (category: Category) => {
+    Alert.alert(
+      'Delete Category?',
+      `Are you sure you want to delete "${category.name}"? Transactions using this category will remain, but will no longer have a category assigned.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => handleDeleteCategory(category.id),
+        },
+      ]
+    );
+  };
+
+  const handleDeleteCategory = async (id: string) => {
+    try {
+      setDeletingId(id);
+      await apiRequest(`/businesses/${businessId}/categories/${id}`, {
+        method: 'DELETE',
+      });
+      setCategories((prev) => prev.filter((c) => c.id !== id));
+    } catch (err: any) {
+      Alert.alert('Error', err.message || 'Failed to delete category');
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   const filteredCategories = categories.filter((c) => {
-    const cType = (c.type || '').toLowerCase();
-    if (activeFilter === 'income') return cType === 'income';
-    if (activeFilter === 'expense') return cType === 'expense';
-    return true;
+    if (!searchQuery.trim()) return true;
+    return c.name.toLowerCase().includes(searchQuery.toLowerCase().trim());
   });
 
   const renderCategoryCard = ({ item }: { item: Category }) => {
-    const isIncome = (item.type || '').toLowerCase() === 'income';
+    const isDeletingThis = deletingId === item.id;
 
     return (
       <View style={styles.card}>
         <View style={styles.cardHeader}>
-          <View
-            style={[
-              styles.iconCircle,
-              isIncome ? styles.incomeIconBg : styles.expenseIconBg,
-            ]}
-          >
-            <Ionicons
-              name="pricetag-outline"
-              size={20}
-              color={isIncome ? '#16A34A' : '#DC2626'}
-            />
+          <View style={styles.iconCircle}>
+            <Ionicons name="pricetag-outline" size={20} color="#2563EB" />
           </View>
 
           <View style={styles.cardTitleContainer}>
             <Text style={styles.categoryName}>{item.name}</Text>
           </View>
 
-          <View
-            style={[
-              styles.typeBadge,
-              isIncome ? styles.incomeBadgeBg : styles.expenseBadgeBg,
-            ]}
+          <Pressable
+            hitSlop={12}
+            onPress={() => confirmDeleteCategory(item)}
+            disabled={isDeletingThis}
+            style={styles.deleteIconButton}
           >
-            <Text
-              style={[
-                styles.typeBadgeText,
-                isIncome ? styles.incomeBadgeText : styles.expenseBadgeText,
-              ]}
-            >
-              {isIncome ? 'Income' : 'Expense'}
-            </Text>
-          </View>
+            {isDeletingThis ? (
+              <ActivityIndicator size="small" color="#DC2626" />
+            ) : (
+              <Ionicons name="trash-outline" size={18} color="#94A3B8" />
+            )}
+          </Pressable>
         </View>
       </View>
     );
@@ -134,12 +151,14 @@ export default function CategoriesScreen({ route, navigation }: Props) {
           >
             <Ionicons name="arrow-back" size={24} color="#0F172A" />
           </Pressable>
+
           <View style={styles.headerTitleContainer}>
             <Text style={styles.headerSubtitle}>{businessName}</Text>
             <Text style={styles.headerTitle} numberOfLines={1}>
-              {bookName ? bookName : 'Categories'}
+              {bookName || 'Categories'}
             </Text>
           </View>
+
           <View style={{ width: 24 }} />
         </View>
 
@@ -148,88 +167,65 @@ export default function CategoriesScreen({ route, navigation }: Props) {
           <View style={styles.bookNavContainer}>
             <Pressable
               style={[styles.bookNavTab, styles.bookNavTabInactive]}
-              onPress={() => navigation.goBack()}
+              onPress={() =>
+                navigation.navigate('Transactions', {
+                  businessId,
+                  businessName,
+                  bookId,
+                  bookName: bookName || '',
+                  currency: currency || '',
+                })
+              }
             >
-              <Ionicons name="receipt-outline" size={16} color="#64748B" style={{ marginRight: 6 }} />
+              <Ionicons
+                name="receipt-outline"
+                size={16}
+                color="#64748B"
+                style={{ marginRight: 6 }}
+              />
               <Text style={styles.bookNavTextInactive}>Transactions</Text>
             </Pressable>
 
-            <Pressable
-              style={[styles.bookNavTab, styles.bookNavTabActive]}
-              onPress={() => {}}
-            >
-              <Ionicons name="pricetags-outline" size={16} color="#2563EB" style={{ marginRight: 6 }} />
+            <View style={[styles.bookNavTab, styles.bookNavTabActive]}>
+              <Ionicons
+                name="pricetags"
+                size={16}
+                color="#2563EB"
+                style={{ marginRight: 6 }}
+              />
               <Text style={styles.bookNavTextActive}>Categories</Text>
-            </Pressable>
+            </View>
           </View>
         ) : null}
 
-        {/* Filter Segmented Bar */}
-        <View style={styles.filterRow}>
-          <Pressable
-            style={[
-              styles.filterTab,
-              activeFilter === 'all' ? styles.filterTabActive : null,
-            ]}
-            onPress={() => setActiveFilter('all')}
-          >
-            <Text
-              style={[
-                styles.filterTabText,
-                activeFilter === 'all' ? styles.filterTabTextActive : null,
-              ]}
-            >
-              All ({categories.length})
-            </Text>
-          </Pressable>
-
-          <Pressable
-            style={[
-              styles.filterTab,
-              activeFilter === 'income' ? styles.filterTabActive : null,
-            ]}
-            onPress={() => setActiveFilter('income')}
-          >
-            <Text
-              style={[
-                styles.filterTabText,
-                activeFilter === 'income' ? styles.filterTabTextActive : null,
-              ]}
-            >
-              Income ({categories.filter((c) => c.type === 'income').length})
-            </Text>
-          </Pressable>
-
-          <Pressable
-            style={[
-              styles.filterTab,
-              activeFilter === 'expense' ? styles.filterTabActive : null,
-            ]}
-            onPress={() => setActiveFilter('expense')}
-          >
-            <Text
-              style={[
-                styles.filterTabText,
-                activeFilter === 'expense' ? styles.filterTabTextActive : null,
-              ]}
-            >
-              Expense ({categories.filter((c) => c.type === 'expense').length})
-            </Text>
-          </Pressable>
+        {/* Search Bar */}
+        <View style={styles.searchBarWrapper}>
+          <Ionicons name="search-outline" size={18} color="#64748B" />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search categories..."
+            placeholderTextColor="#94A3B8"
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+          />
+          {searchQuery ? (
+            <Pressable onPress={() => setSearchQuery('')}>
+              <Ionicons name="close-circle" size={16} color="#94A3B8" />
+            </Pressable>
+          ) : null}
         </View>
 
-        {/* Section Title & Add CTA */}
+        {/* Section Header */}
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Category List</Text>
+          <Text style={styles.sectionTitle}>
+            Business Categories ({filteredCategories.length})
+          </Text>
           <Pressable
             style={styles.headerCreateButton}
             onPress={() =>
               navigation.navigate('CreateCategory', {
                 businessId,
                 businessName,
-                bookId,
-                bookName,
-                currency,
               })
             }
           >
@@ -276,9 +272,9 @@ export default function CategoriesScreen({ route, navigation }: Props) {
                 <View style={styles.emptyIconCircle}>
                   <Ionicons name="pricetags-outline" size={44} color="#64748B" />
                 </View>
-                <Text style={styles.emptyTitle}>No categories yet</Text>
+                <Text style={styles.emptyTitle}>No categories found</Text>
                 <Text style={styles.emptySubtitle}>
-                  Create categories for {businessName} to organize your income and expense records.
+                  Create categories for {businessName} to attach to your transactions.
                 </Text>
 
                 <Pressable
@@ -324,7 +320,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F1F5F9',
     borderRadius: 10,
     padding: 3,
-    marginBottom: 16,
+    marginBottom: 12,
   },
   bookNavTab: {
     flex: 1,
@@ -373,35 +369,20 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#0F172A',
   },
-  filterRow: {
+  searchBarWrapper: {
     flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: '#F1F5F9',
     borderRadius: 10,
-    padding: 4,
-    marginBottom: 16,
+    paddingHorizontal: 12,
+    height: 42,
+    gap: 8,
+    marginBottom: 14,
   },
-  filterTab: {
+  searchInput: {
     flex: 1,
-    paddingVertical: 8,
-    alignItems: 'center',
-    borderRadius: 8,
-  },
-  filterTabActive: {
-    backgroundColor: '#FFFFFF',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 1,
-    elevation: 1,
-  },
-  filterTabText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#64748B',
-  },
-  filterTabTextActive: {
-    color: '#2563EB',
-    fontWeight: '700',
+    fontSize: 14,
+    color: '#0F172A',
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -410,7 +391,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   sectionTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '700',
     color: '#0F172A',
   },
@@ -490,15 +471,10 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 10,
+    backgroundColor: '#EFF6FF',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
-  },
-  incomeIconBg: {
-    backgroundColor: '#DCFCE7',
-  },
-  expenseIconBg: {
-    backgroundColor: '#FEE2E2',
   },
   cardTitleContainer: {
     flex: 1,
@@ -508,26 +484,8 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#0F172A',
   },
-  typeBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  incomeBadgeBg: {
-    backgroundColor: '#DCFCE7',
-  },
-  expenseBadgeBg: {
-    backgroundColor: '#FEE2E2',
-  },
-  typeBadgeText: {
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  incomeBadgeText: {
-    color: '#15803D',
-  },
-  expenseBadgeText: {
-    color: '#B91C1C',
+  deleteIconButton: {
+    padding: 4,
   },
   emptyContainer: {
     alignItems: 'center',

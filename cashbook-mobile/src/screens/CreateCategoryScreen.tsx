@@ -1,19 +1,17 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import {
+  View,
+  Text,
+  StyleSheet,
+  TextInput,
+  Pressable,
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
-
+import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../App';
 import { apiRequest } from '../services/api';
 
@@ -22,54 +20,31 @@ type Props = NativeStackScreenProps<RootStackParamList, 'CreateCategory'>;
 export default function CreateCategoryScreen({ route, navigation }: Props) {
   const { businessId, businessName } = route.params;
 
-  const [type, setType] = useState<'income' | 'expense'>('income');
   const [name, setName] = useState('');
-
   const [loading, setLoading] = useState(false);
-  const [nameError, setNameError] = useState('');
-  const [generalError, setGeneralError] = useState('');
-
-  const validate = () => {
-    let isValid = true;
-    setNameError('');
-    setGeneralError('');
-
-    const trimmedName = name.trim();
-    if (!trimmedName) {
-      setNameError('Category name is required');
-      isValid = false;
-    } else if (trimmedName.length > 100) {
-      setNameError('Category name cannot exceed 100 characters');
-      isValid = false;
-    }
-
-    return isValid;
-  };
+  const [error, setError] = useState('');
 
   const handleSubmit = async () => {
-    if (!validate()) return;
+    const trimmedName = name.trim();
+    if (!trimmedName) {
+      setError('Category name is required');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
 
     try {
-      setLoading(true);
-
-      const payload = {
-        name: name.trim(),
-        type,
-      };
-
       await apiRequest(`/businesses/${businessId}/categories`, {
         method: 'POST',
-        body: JSON.stringify(payload),
+        body: JSON.stringify({
+          name: trimmedName,
+        }),
       });
 
       navigation.goBack();
-    } catch (err) {
-      console.error('CREATE CATEGORY ERROR:', err);
-      const message =
-        err instanceof Error
-          ? err.message
-          : 'Failed to create category. Please try again.';
-      setGeneralError(message);
+    } catch (err: any) {
+      setError(err.message || 'Failed to create category');
     } finally {
       setLoading(false);
     }
@@ -78,17 +53,16 @@ export default function CreateCategoryScreen({ route, navigation }: Props) {
   return (
     <SafeAreaView style={styles.safeArea}>
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <View style={styles.container}>
-          {/* Top Header */}
+          {/* Header */}
           <View style={styles.topBar}>
             <Pressable
               onPress={() => navigation.goBack()}
               style={styles.backButton}
               hitSlop={12}
-              disabled={loading}
             >
               <Ionicons name="arrow-back" size={24} color="#0F172A" />
             </Pressable>
@@ -99,108 +73,44 @@ export default function CreateCategoryScreen({ route, navigation }: Props) {
             <View style={{ width: 24 }} />
           </View>
 
-          <ScrollView
-            contentContainerStyle={styles.scrollContent}
-            keyboardShouldPersistTaps="handled"
+          {error ? (
+            <View style={styles.errorBanner}>
+              <Ionicons name="alert-circle" size={20} color="#DC2626" />
+              <Text style={styles.errorBannerText}>{error}</Text>
+            </View>
+          ) : null}
+
+          {/* Form Field */}
+          <View style={styles.fieldContainer}>
+            <Text style={styles.label}>
+              Category Name <Text style={styles.required}>*</Text>
+            </Text>
+            <TextInput
+              style={styles.textInput}
+              placeholder="e.g. Service, Warranty, Spare Parts"
+              placeholderTextColor="#94A3B8"
+              value={name}
+              onChangeText={(val) => {
+                setName(val);
+                if (error) setError('');
+              }}
+              autoFocus
+              editable={!loading}
+            />
+          </View>
+
+          {/* Submit Button */}
+          <Pressable
+            style={[styles.submitButton, loading ? styles.disabledButton : null]}
+            onPress={handleSubmit}
+            disabled={loading}
           >
-            {/* General Error Banner */}
-            {generalError ? (
-              <View style={styles.errorBanner}>
-                <Ionicons name="alert-circle-outline" size={20} color="#DC2626" />
-                <Text style={styles.errorBannerText}>{generalError}</Text>
-              </View>
-            ) : null}
-
-            {/* Type Selector (Income / Expense) */}
-            <Text style={styles.label}>Category Type</Text>
-            <View style={styles.typeSelectorRow}>
-              <Pressable
-                style={[
-                  styles.typeTab,
-                  type === 'income' ? styles.incomeTabActive : styles.tabInactive,
-                ]}
-                onPress={() => setType('income')}
-              >
-                <Ionicons
-                  name="arrow-down-circle"
-                  size={20}
-                  color={type === 'income' ? '#16A34A' : '#64748B'}
-                  style={{ marginRight: 6 }}
-                />
-                <Text
-                  style={[
-                    styles.typeTabText,
-                    type === 'income' ? styles.incomeTabTextActive : styles.tabTextInactive,
-                  ]}
-                >
-                  Income
-                </Text>
-              </Pressable>
-
-              <Pressable
-                style={[
-                  styles.typeTab,
-                  type === 'expense' ? styles.expenseTabActive : styles.tabInactive,
-                ]}
-                onPress={() => setType('expense')}
-              >
-                <Ionicons
-                  name="arrow-up-circle"
-                  size={20}
-                  color={type === 'expense' ? '#DC2626' : '#64748B'}
-                  style={{ marginRight: 6 }}
-                />
-                <Text
-                  style={[
-                    styles.typeTabText,
-                    type === 'expense' ? styles.expenseTabTextActive : styles.tabTextInactive,
-                  ]}
-                >
-                  Expense
-                </Text>
-              </Pressable>
-            </View>
-
-            {/* Category Name Field */}
-            <View style={styles.fieldContainer}>
-              <Text style={styles.label}>
-                Category Name <Text style={styles.required}>*</Text>
-              </Text>
-              <TextInput
-                style={[
-                  styles.textInputFull,
-                  nameError ? styles.inputErrorBorder : null,
-                ]}
-                placeholder="e.g. Sales, Rent, Payroll, Consulting"
-                placeholderTextColor="#94A3B8"
-                value={name}
-                onChangeText={(val) => {
-                  setName(val);
-                  if (nameError) setNameError('');
-                }}
-                editable={!loading}
-              />
-              {nameError ? (
-                <Text style={styles.fieldErrorText}>{nameError}</Text>
-              ) : null}
-            </View>
-
-            {/* Submit Button */}
-            <Pressable
-              style={[
-                styles.submitButton,
-                loading ? styles.disabledButton : null,
-              ]}
-              onPress={handleSubmit}
-              disabled={loading}
-            >
-              {loading ? (
-                <ActivityIndicator color="#FFFFFF" />
-              ) : (
-                <Text style={styles.submitButtonText}>Save Category</Text>
-              )}
-            </Pressable>
-          </ScrollView>
+            {loading ? (
+              <ActivityIndicator color="#FFFFFF" />
+            ) : (
+              <Text style={styles.submitButtonText}>Create Category</Text>
+            )}
+          </Pressable>
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -222,7 +132,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingVertical: 8,
-    marginBottom: 8,
+    marginBottom: 16,
   },
   backButton: {
     padding: 4,
@@ -242,9 +152,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#0F172A',
   },
-  scrollContent: {
-    paddingBottom: 40,
-  },
   errorBanner: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -261,6 +168,9 @@ const styles = StyleSheet.create({
     marginLeft: 8,
     flex: 1,
   },
+  fieldContainer: {
+    marginBottom: 20,
+  },
   label: {
     fontSize: 14,
     fontWeight: '600',
@@ -270,52 +180,7 @@ const styles = StyleSheet.create({
   required: {
     color: '#DC2626',
   },
-  typeSelectorRow: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 20,
-  },
-  typeTab: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 12,
-    borderRadius: 10,
-    borderWidth: 1,
-  },
-  tabInactive: {
-    backgroundColor: '#F8FAFC',
-    borderColor: '#E2E8F0',
-  },
-  incomeTabActive: {
-    backgroundColor: '#DCFCE7',
-    borderColor: '#16A34A',
-  },
-  expenseTabActive: {
-    backgroundColor: '#FEE2E2',
-    borderColor: '#DC2626',
-  },
-  typeTabText: {
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  tabTextInactive: {
-    color: '#64748B',
-  },
-  incomeTabTextActive: {
-    color: '#15803D',
-  },
-  expenseTabTextActive: {
-    color: '#B91C1C',
-  },
-  fieldContainer: {
-    marginBottom: 20,
-  },
-  inputErrorBorder: {
-    borderColor: '#DC2626',
-  },
-  textInputFull: {
+  textInput: {
     borderWidth: 1,
     borderColor: '#CBD5E1',
     borderRadius: 10,
@@ -325,18 +190,13 @@ const styles = StyleSheet.create({
     color: '#0F172A',
     backgroundColor: '#FFFFFF',
   },
-  fieldErrorText: {
-    fontSize: 12,
-    color: '#DC2626',
-    marginTop: 4,
-  },
   submitButton: {
     height: 50,
     borderRadius: 10,
     backgroundColor: '#2563EB',
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 12,
+    marginTop: 8,
   },
   disabledButton: {
     opacity: 0.6,
